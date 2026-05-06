@@ -2,6 +2,7 @@ import os
 
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils.encoding import escape_uri_path
 
 from .models import CompressionPreset, CompatibilityLevel, JobStatus, PDFJob
 from .tasks import compress_pdf
@@ -85,8 +86,24 @@ def download(request, job_id):
     if not job.compressed_file or not os.path.exists(job.compressed_file.path):
         raise Http404("El archivo comprimido no existe.")
 
-    return FileResponse(
-        open(job.compressed_file.path, "rb"),
-        as_attachment=True,
-        filename=job.original_filename,
+    with open(job.compressed_file.path, "rb") as f:
+        content = f.read()
+
+    filename = job.original_filename
+    original_path = job.original_file.path if job.original_file else None
+    compressed_path = job.compressed_file.path
+
+    for path in (original_path, compressed_path):
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    job.delete()
+
+    response = HttpResponse(content, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f"attachment; filename*=UTF-8''{escape_uri_path(filename)}"
     )
+    response["Content-Length"] = str(len(content))
+    return response

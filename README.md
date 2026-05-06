@@ -27,9 +27,12 @@ La app estará en [http://localhost:8000](http://localhost:8000).
 - Procesamiento en background con Celery
 - Progreso en tiempo real via HTMX (polling cada 2s)
 - Si el archivo comprimido es mayor que el original, se sirve el original
+- **Descarga única**: al descargar el PDF se elimina el job y los archivos físicos del servidor; la página se recarga automáticamente para ocultar el job borrado
 
 ### Presets de calidad
-| Preset | DPI | Uso |
+La resolución (ppp / dpi) se muestra en cada botón de la interfaz.
+
+| Preset | PPP | Uso |
 |--------|-----|-----|
 | Pantalla | 72 | Mínimo tamaño, para pantalla/web |
 | eBook | 150 | Equilibrado (default) |

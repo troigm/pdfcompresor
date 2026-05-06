@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0] - 2026-05-06
+
+### Añadido
+- Indicación de resolución (ppp) en cada botón de preset: 72 / 150 / 300 / 300
+
+### Cambiado
+- La descarga ahora elimina el job y los archivos físicos (original y comprimido) tras servir el contenido — descarga única, sin residuos
+- Tras pulsar "Descargar" la página se recarga automáticamente para ocultar el job ya borrado
+
 ## [1.0.0] - 2026-03-21
 
 ### Añadido
