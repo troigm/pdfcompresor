@@ -1,12 +1,12 @@
 # MochaCompress
 
-Aplicación web para comprimir archivos PDF usando Ghostscript como motor de compresión. Interfaz oscura Catppuccin Mocha con procesamiento asíncrono.
+Aplicación web para comprimir archivos PDF y extraer imágenes embebidas. Usa Ghostscript para compresión y `pdfimages` (poppler-utils) para extracción. Interfaz oscura Catppuccin Mocha con procesamiento asíncrono.
 
 ## Stack
 
 - **Backend**: Django 6.0 + Celery 5.6 + Redis 7
 - **Base de datos**: PostgreSQL 18
-- **Motor PDF**: Ghostscript
+- **Motor PDF**: Ghostscript (compresión) + poppler-utils (extracción de imágenes)
 - **Frontend**: Bootstrap 5.3 + HTMX 2.x
 - **Despliegue**: Docker Compose
 
@@ -21,13 +21,27 @@ La app estará en [http://localhost:8000](http://localhost:8000).
 
 ## Funcionalidades
 
+### Modos de operación
+La interfaz ofrece dos modos seleccionables antes de la subida:
+
+| Modo | Resultado | Motor |
+|------|-----------|-------|
+| Comprimir PDF | PDF comprimido | Ghostscript |
+| Extraer imágenes | ZIP con las imágenes embebidas en su resolución original | `pdfimages` (poppler-utils) |
+
 ### Compresión de PDFs
 - Subida por arrastre (drag & drop) o selección de archivo
 - Límite de 100 MB por archivo
 - Procesamiento en background con Celery
 - Progreso en tiempo real via HTMX (polling cada 2s)
 - Si el archivo comprimido es mayor que el original, se sirve el original
-- **Descarga única**: al descargar el PDF se elimina el job y los archivos físicos del servidor; la página se recarga automáticamente para ocultar el job borrado
+- **Descarga única**: al descargar el resultado se elimina el job y los archivos físicos del servidor; la página se recarga automáticamente para ocultar el job borrado
+
+### Extracción de imágenes
+- Ejecuta `pdfimages -all` para extraer cada imagen embebida en su formato original (JPEG, PNG, JBIG2, etc.)
+- Empaqueta el resultado en un ZIP con compresión deflate
+- Falla con mensaje claro si el PDF no contiene imágenes embebidas extraíbles
+- Misma descarga única + borrado automático que el flujo de compresión
 
 ### Presets de calidad
 La resolución (ppp / dpi) se muestra en cada botón de la interfaz.

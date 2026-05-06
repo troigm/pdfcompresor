@@ -244,6 +244,29 @@ body {
       {% csrf_token %}
       <input type="file" name="pdf_file" id="file-input" accept=".pdf,application/pdf" class="d-none">
 
+      <!-- Mode selector: Comprimir vs Extraer imágenes -->
+      <div class="mb-4">
+        <div class="small text-secondary mb-2">¿Qué quieres hacer?</div>
+        <div class="row g-2">
+          <div class="col-6">
+            <input type="radio" class="btn-check" name="mode" id="mode-compress" value="compress" checked>
+            <label class="preset-card d-block text-center p-3 rounded-3" for="mode-compress">
+              <i class="bi bi-file-earmark-zip d-block fs-5 mb-1"></i>
+              <div class="small fw-semibold">Comprimir PDF</div>
+              <div style="font-size:.7rem;opacity:.65">Reduce el tamaño</div>
+            </label>
+          </div>
+          <div class="col-6">
+            <input type="radio" class="btn-check" name="mode" id="mode-extract" value="extract_images">
+            <label class="preset-card d-block text-center p-3 rounded-3" for="mode-extract">
+              <i class="bi bi-images d-block fs-5 mb-1"></i>
+              <div class="small fw-semibold">Extraer imágenes</div>
+              <div style="font-size:.7rem;opacity:.65">ZIP con imágenes embebidas</div>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- Drop Zone -->
       <div class="upload-zone p-4 p-lg-5 text-center mb-4" id="drop-zone">
         <div class="upload-icon mb-2">
@@ -262,7 +285,7 @@ body {
       </div>
 
       <!-- Preset Selector: 4 cards in a 2x2 / 4-col grid -->
-      <div class="mb-3">
+      <div class="mb-3 compress-only" id="preset-section">
         <div class="small text-secondary mb-2">Nivel de compresión</div>
         <div class="row g-2">
           <div class="col-6 col-md-3">
@@ -301,7 +324,7 @@ body {
       </div>
 
       <!-- Compatibility selector -->
-      <div class="mb-3">
+      <div class="mb-3 compress-only" id="compat-section">
         <div class="small text-secondary mb-2">Compatibilidad PDF</div>
         <select name="compatibility" id="compat-select" class="form-select rounded-3">
           {% for value, label in compatibilities %}
@@ -316,15 +339,28 @@ body {
         PDF/A elimina enlaces, marcadores y formularios del documento. El tamaño puede aumentar.
       </div>
 
-      <div class="info-note px-3 py-2 mb-4 small">
+      <div class="info-note px-3 py-2 mb-4 small compress-only" id="fonts-note">
         <i class="bi bi-shield-check me-1"></i>
         Fuentes incrustadas y subconjuntos optimizados en todos los modos
       </div>
 
-      <!-- Compress Button: full-width, prominent -->
+      <div class="info-note px-3 py-2 mb-4 small extract-only" id="extract-note" style="display:none">
+        <i class="bi bi-info-circle me-1"></i>
+        Extrae las imágenes embebidas del PDF en su resolución original y las empaqueta en un ZIP.
+      </div>
+
+      <!-- Submit Button: label changes per mode -->
       <button type="submit" class="btn btn-primary btn-lg w-100 rounded-3" id="btn-compress" disabled>
-        <span class="btn-text"><i class="bi bi-lightning-charge me-2"></i>Comprimir PDF</span>
-        <span class="htmx-indicator"><span class="spinner-border spinner-border-sm me-2"></span>Comprimiendo...</span>
+        <span class="btn-text">
+          <i class="bi bi-lightning-charge me-2"></i>
+          <span class="label-compress">Comprimir PDF</span>
+          <span class="label-extract" style="display:none">Extraer imágenes</span>
+        </span>
+        <span class="htmx-indicator">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          <span class="label-compress">Comprimiendo...</span>
+          <span class="label-extract" style="display:none">Extrayendo...</span>
+        </span>
       </button>
     </form>
   </div>
@@ -409,6 +445,27 @@ const pdfaWarning = document.getElementById('pdfa-warning');
 compatSelect.addEventListener('change', () => {
     pdfaWarning.style.display = compatSelect.value === 'pdfa-2b' ? 'block' : 'none';
 });
+
+// Mode toggle: show/hide compression-only sections and swap button label
+const modeRadios = document.querySelectorAll('input[name="mode"]');
+function applyMode() {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const isCompress = mode === 'compress';
+    document.querySelectorAll('.compress-only').forEach(el => {
+        el.style.display = isCompress ? '' : 'none';
+    });
+    document.querySelectorAll('.extract-only').forEach(el => {
+        el.style.display = isCompress ? 'none' : '';
+    });
+    document.querySelectorAll('.label-compress').forEach(el => {
+        el.style.display = isCompress ? '' : 'none';
+    });
+    document.querySelectorAll('.label-extract').forEach(el => {
+        el.style.display = isCompress ? 'none' : '';
+    });
+}
+modeRadios.forEach(r => r.addEventListener('change', applyMode));
+applyMode();
 </script>
 </body>
 </html>

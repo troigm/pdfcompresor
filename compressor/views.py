@@ -4,8 +4,8 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils.encoding import escape_uri_path
 
-from .models import CompressionPreset, CompatibilityLevel, JobStatus, PDFJob
-from .tasks import compress_pdf
+from .models import CompressionPreset, CompatibilityLevel, JobMode, JobStatus, PDFJob
+from .tasks import compress_pdf, extract_images
 
 MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100 MB
 
@@ -21,6 +21,7 @@ def index(request):
             "jobs": jobs,
             "presets": presets,
             "compatibilities": CompatibilityLevel.choices,
+            "modes": JobMode.choices,
         },
     )
 
@@ -57,15 +58,24 @@ def upload(request):
     if compatibility not in CompatibilityLevel.values:
         compatibility = "pdf-1.7"
 
+    mode = request.POST.get("mode", JobMode.COMPRESS)
+    if mode not in JobMode.values:
+        mode = JobMode.COMPRESS
+
     job = PDFJob.objects.create(
         original_file=pdf_file,
         original_filename=pdf_file.name,
         original_size=pdf_file.size,
         preset=preset,
         compatibility=compatibility,
+        mode=mode,
     )
 
-    task = compress_pdf.delay(str(job.id))
+    if mode == JobMode.EXTRACT_IMAGES:
+        task = extract_images.delay(str(job.id))
+    else:
+        task = compress_pdf.delay(str(job.id))
+
     job.celery_task_id = task.id
     job.save(update_fields=["celery_task_id"])
 
@@ -89,7 +99,14 @@ def download(request, job_id):
     with open(job.compressed_file.path, "rb") as f:
         content = f.read()
 
-    filename = job.original_filename
+    if job.mode == JobMode.EXTRACT_IMAGES:
+        base = os.path.splitext(job.original_filename)[0]
+        filename = f"{base}_imagenes.zip"
+        content_type = "application/zip"
+    else:
+        filename = job.original_filename
+        content_type = "application/pdf"
+
     original_path = job.original_file.path if job.original_file else None
     compressed_path = job.compressed_file.path
 
@@ -101,7 +118,7 @@ def download(request, job_id):
                 pass
     job.delete()
 
-    response = HttpResponse(content, content_type="application/pdf")
+    response = HttpResponse(content, content_type=content_type)
     response["Content-Disposition"] = (
         f"attachment; filename*=UTF-8''{escape_uri_path(filename)}"
     )

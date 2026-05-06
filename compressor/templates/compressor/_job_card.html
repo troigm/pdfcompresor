@@ -14,9 +14,9 @@
       </div>
       <div>
         <div class="fw-semibold">{{ job.original_filename }}</div>
-        <div class="small text-secondary">{{ job.original_size_human }} &middot; {% if job.preset == "screen" %}Pantalla{% elif job.preset == "ebook" %}eBook{% elif job.preset == "printer" %}Impresora{% elif job.preset == "prepress" %}Preimpresi&oacute;n{% else %}{{ job.preset }}{% endif %}{% if job.compatibility and job.compatibility != "pdf-1.4" %}
+        <div class="small text-secondary">{{ job.original_size_human }}{% if job.mode == "extract_images" %} &middot; Extraer im&aacute;genes{% else %} &middot; {% if job.preset == "screen" %}Pantalla{% elif job.preset == "ebook" %}eBook{% elif job.preset == "printer" %}Impresora{% elif job.preset == "prepress" %}Preimpresi&oacute;n{% else %}{{ job.preset }}{% endif %}{% if job.compatibility and job.compatibility != "pdf-1.4" %}
   <span class="ms-1" style="opacity:.6">· {% if job.compatibility == "pdfa-2b" %}PDF/A{% elif job.compatibility == "pdf-1.5" %}PDF 1.5{% elif job.compatibility == "pdf-1.7" %}PDF 1.7{% endif %}</span>
-{% endif %}</div>
+{% endif %}{% endif %}</div>
       </div>
     </div>
     <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -46,10 +46,15 @@
   {% if job.status == "completed" %}
     <div class="d-flex justify-content-between align-items-center mt-3 pt-3" style="border-top: 1px solid rgba(186,194,222,0.08);">
       <div>
-        <span class="text-secondary">{{ job.original_size_human }}</span>
-        <i class="bi bi-arrow-right mx-2 text-secondary"></i>
-        <span class="fw-bold">{{ job.compressed_size_human }}</span>
-        <span class="badge rounded-pill badge-soft-success ms-2 px-3 py-2">-{{ job.savings_percent|floatformat:1 }}%</span>
+        {% if job.mode == "extract_images" %}
+          <span class="fw-bold">{{ job.image_count }} im&aacute;gen{{ job.image_count|pluralize:"es" }}</span>
+          <span class="badge rounded-pill badge-soft-info ms-2 px-3 py-2">{{ job.compressed_size_human }} ZIP</span>
+        {% else %}
+          <span class="text-secondary">{{ job.original_size_human }}</span>
+          <i class="bi bi-arrow-right mx-2 text-secondary"></i>
+          <span class="fw-bold">{{ job.compressed_size_human }}</span>
+          <span class="badge rounded-pill badge-soft-success ms-2 px-3 py-2">-{{ job.savings_percent|floatformat:1 }}%</span>
+        {% endif %}
       </div>
       <a href="{% url 'compressor:download' job.id %}"
          class="btn btn-sm btn-primary rounded-pill px-3"

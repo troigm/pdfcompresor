@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-05-06
+
+### Añadido
+- Extracción de imágenes embebidas del PDF con `pdfimages` (poppler-utils), empaquetadas en un ZIP
+- Selector de modo en la UI: "Comprimir PDF" / "Extraer imágenes"
+- Campo `mode` y `image_count` en el modelo `PDFJob` (migración 0004)
+- Nueva tarea Celery `extract_images` con reintentos y timeout de 5 min
+- Card del job adaptada por modo: muestra "N imágenes · tamaño ZIP" cuando aplica
+
+### Cambiado
+- Vista `download` sirve `application/zip` o `application/pdf` según el modo
+- Selectores de preset y compatibilidad se ocultan al elegir extracción
+- Dockerfile añade `poppler-utils` junto a `ghostscript`
+
 ## [1.1.0] - 2026-05-06
 
 ### Añadido

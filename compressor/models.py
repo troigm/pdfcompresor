@@ -24,6 +24,11 @@ class JobStatus(models.TextChoices):
     FAILED = "failed", "Fallido"
 
 
+class JobMode(models.TextChoices):
+    COMPRESS = "compress", "Comprimir"
+    EXTRACT_IMAGES = "extract_images", "Extraer imágenes"
+
+
 class PDFJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     original_file = models.FileField(upload_to="uploads/%Y/%m/%d/")
@@ -40,6 +45,10 @@ class PDFJob(models.Model):
     status = models.CharField(
         max_length=20, choices=JobStatus.choices, default=JobStatus.PENDING
     )
+    mode = models.CharField(
+        max_length=20, choices=JobMode.choices, default=JobMode.COMPRESS
+    )
+    image_count = models.IntegerField(default=0)
     original_size = models.BigIntegerField(default=0)
     compressed_size = models.BigIntegerField(default=0)
     compression_ratio = models.FloatField(default=0)
