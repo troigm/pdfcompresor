@@ -4,9 +4,9 @@ services:
     restart: unless-stopped
     env_file: .env.prod
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -23,17 +23,20 @@ services:
   web:
     build: .
     restart: unless-stopped
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn pdf_compressor.wsgi:application
-               --bind 0.0.0.0:8000
-               --workers 3
-               --timeout 120
-               --max-requests 500
-               --max-requests-jitter 50
-               --access-logfile -
-               --error-logfile -"
+    command:
+      - sh
+      - -c
+      - |
+        python manage.py migrate && \
+        python manage.py collectstatic --noinput && \
+        exec gunicorn pdf_compressor.wsgi:application \
+          --bind 0.0.0.0:8000 \
+          --workers 3 \
+          --timeout 120 \
+          --max-requests 500 \
+          --max-requests-jitter 50 \
+          --access-logfile - \
+          --error-logfile -
     env_file: .env.prod
     volumes:
       - media_data:/app/media
