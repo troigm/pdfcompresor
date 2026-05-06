@@ -10,7 +10,7 @@ Aplicación web para comprimir archivos PDF y extraer imágenes embebidas. Usa G
 - **Frontend**: Bootstrap 5.3 + HTMX 2.x
 - **Despliegue**: Docker Compose
 
-## Inicio rápido
+## Inicio rápido (desarrollo)
 
 ```bash
 cp .env.example .env
@@ -18,6 +18,29 @@ docker compose up --build -d
 ```
 
 La app estará en [http://localhost:8000](http://localhost:8000).
+
+## Despliegue en producción (Traefik en red local)
+
+Producción usa Gunicorn + WhiteNoise detrás de Traefik (sin HTTPS, en LAN).
+
+```bash
+cp .env.prod.example .env.prod
+# editar .env.prod (SECRET_KEY, POSTGRES_PASSWORD, hostname)
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+**Requisitos previos:**
+- Una instancia de Traefik corriendo aparte con red Docker externa `proxy` y entrypoint `web` en :80
+- Resolución DNS interna apuntando al host Traefik (por defecto `pdf.comrec.lan`)
+
+**Diferencias con dev:**
+- WhiteNoise sirve los static files (con compresión Brotli/Gzip y manifest)
+- Sin puerto publicado: el tráfico entra por Traefik vía la red `proxy`
+- Gunicorn con `--timeout 120` (subidas de 100 MB) y `--max-requests 500` (reciclado de workers)
+- `restart: unless-stopped` en todos los servicios
+- `collectstatic` se ejecuta al arrancar el contenedor `web`
+
+**Cambiar el hostname:** edita `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS` en `.env.prod` y la label `traefik.http.routers.pdfcompressor.rule` en `docker-compose.prod.yml`.
 
 ## Funcionalidades
 

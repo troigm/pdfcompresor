@@ -1,0 +1,86 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn pdf_compressor.wsgi:application
+               --bind 0.0.0.0:8000
+               --workers 3
+               --timeout 120
+               --max-requests 500
+               --max-requests-jitter 50
+               --access-logfile -
+               --error-logfile -"
+    env_file: .env.prod
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.pdfcompressor.rule=Host(`pdf.comrec.lan`)"
+      - "traefik.http.routers.pdfcompressor.entrypoints=web"
+      - "traefik.http.services.pdfcompressor.loadbalancer.server.port=8000"
+
+  celery:
+    build: .
+    restart: unless-stopped
+    command: celery -A pdf_compressor worker -l info -c 2
+    env_file: .env.prod
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: .
+    restart: unless-stopped
+    command: celery -A pdf_compressor beat -l info
+    env_file: .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+networks:
+  default:
+  proxy:
+    external: true
+
+volumes:
+  pgdata:
+  media_data:

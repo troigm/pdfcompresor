@@ -4,3 +4,4 @@ redis>=5.0
 django-celery-results>=2.5
 gunicorn>=25.0
 psycopg[binary]>=3.2
+whitenoise[brotli]>=6.7

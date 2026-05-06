@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.0] - 2026-05-06
+
+### Añadido
+- Configuración de producción con `docker-compose.prod.yml` para Traefik en LAN sin HTTPS
+- WhiteNoise para servir static files (compresión Brotli/Gzip + manifest)
+- Variables `DJANGO_CSRF_TRUSTED_ORIGINS` y `DJANGO_USE_X_FORWARDED_HOST`
+- `.env.prod.example` con defaults seguros para producción
+- Sección "Despliegue en producción" en el README
+
+### Cambiado
+- Gunicorn en producción con `--timeout 120`, `--max-requests 500`, `--max-requests-jitter 50` y logs por stdout
+- `STORAGES` con `whitenoise.storage.CompressedManifestStaticFilesStorage`
+- `collectstatic` ejecutado al arrancar el contenedor `web` (en vez de al construir la imagen)
+- ALLOWED_HOSTS hace strip de espacios en los valores
+
 ## [1.2.0] - 2026-05-06
 
 ### Añadido
