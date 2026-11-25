@@ -1,0 +1,8 @@
+# Keep secrets, VCS metadata and runtime data out of the image (COPY . .)
+.env
+.env.*
+.git
+media/
+*.bak*
+.superpowers/
+**/__pycache__/
