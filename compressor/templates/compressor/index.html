@@ -208,6 +208,22 @@ body {
 .file-info { display: none; }
 .file-info.active { display: block; }
 
+.merge-list { display: none; }
+.merge-list.active { display: block; }
+.merge-items { max-height: 50vh; overflow-y: auto; }
+.merge-item {
+  background: rgba(24, 24, 37, 0.6);
+  border: 1px solid rgba(186, 194, 222, 0.10);
+  border-radius: .6rem;
+  cursor: grab;
+}
+.merge-item.dragging { opacity: .4; }
+.merge-item.drop-target { border-color: rgba(203, 166, 247, 0.55); }
+.merge-item .merge-pos { color: var(--ctp-overlay1); min-width: 2rem; }
+.merge-item .merge-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.merge-remove { background: none; border: 0; color: var(--ctp-overlay1); }
+.merge-remove:hover { color: var(--ctp-red); }
+
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator { display: inline-block; }
 .htmx-request .btn-text { display: none; }
@@ -243,12 +259,15 @@ body {
           hx-disabled-elt="#btn-compress">
       {% csrf_token %}
       <input type="file" name="pdf_file" id="file-input" accept=".pdf,application/pdf" class="d-none">
+      <!-- Merge mode: picker has no name (never submitted); pdf_files is rebuilt from the ordered list -->
+      <input type="file" id="merge-picker" accept=".pdf,application/pdf" multiple class="d-none">
+      <input type="file" name="pdf_files" id="merge-input" multiple class="d-none">
 
       <!-- Mode selector: Comprimir vs Extraer imágenes -->
       <div class="mb-4">
         <div class="small text-secondary mb-2">¿Qué quieres hacer?</div>
         <div class="row g-2">
-          <div class="col-6">
+          <div class="col-4">
             <input type="radio" class="btn-check" name="mode" id="mode-compress" value="compress" checked>
             <label class="preset-card d-block text-center p-3 rounded-3" for="mode-compress">
               <i class="bi bi-file-earmark-zip d-block fs-5 mb-1"></i>
@@ -256,12 +275,20 @@ body {
               <div style="font-size:.7rem;opacity:.65">Reduce el tamaño</div>
             </label>
           </div>
-          <div class="col-6">
+          <div class="col-4">
             <input type="radio" class="btn-check" name="mode" id="mode-extract" value="extract_images">
             <label class="preset-card d-block text-center p-3 rounded-3" for="mode-extract">
               <i class="bi bi-images d-block fs-5 mb-1"></i>
               <div class="small fw-semibold">Extraer imágenes</div>
               <div style="font-size:.7rem;opacity:.65">ZIP con imágenes embebidas</div>
+            </label>
+          </div>
+          <div class="col-4">
+            <input type="radio" class="btn-check" name="mode" id="mode-merge" value="merge">
+            <label class="preset-card d-block text-center p-3 rounded-3" for="mode-merge">
+              <i class="bi bi-files d-block fs-5 mb-1"></i>
+              <div class="small fw-semibold">Combinar y comprimir</div>
+              <div style="font-size:.7rem;opacity:.65">Factura + albaranes en un PDF</div>
             </label>
           </div>
         </div>
@@ -272,8 +299,10 @@ body {
         <div class="upload-icon mb-2">
           <i class="bi bi-cloud-arrow-up"></i>
         </div>
-        <div class="fw-semibold mb-1">Arrastra tu PDF aquí</div>
-        <div class="text-secondary small">o haz clic para seleccionar · máx. 100 MB</div>
+        <div class="fw-semibold mb-1" data-modes="compress extract_images">Arrastra tu PDF aquí</div>
+        <div class="text-secondary small" data-modes="compress extract_images">o haz clic para seleccionar · máx. 100 MB</div>
+        <div class="fw-semibold mb-1" data-modes="merge">Arrastra la factura y los albaranes</div>
+        <div class="text-secondary small" data-modes="merge">o haz clic para añadir · se combinan en el orden de la lista · hasta 100 archivos, 300 MB en total</div>
         <!-- File info badge, shown when file is selected -->
         <div class="file-info mt-3" id="file-info">
           <span class="badge rounded-pill badge-soft-primary px-3 py-2">
@@ -284,8 +313,18 @@ body {
         </div>
       </div>
 
+      <!-- Merge: ordered file list (drag to reorder) -->
+      <div class="merge-list mb-4" id="merge-list" data-modes="merge">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="small text-secondary">Orden del PDF final · arrastra para reordenar</div>
+          <div class="small fw-semibold" id="merge-summary"></div>
+        </div>
+        <div class="merge-items vstack gap-1" id="merge-items"></div>
+      </div>
+      <div class="info-note pdfa-warning px-3 py-2 mb-3 small" id="merge-warning" style="display:none"></div>
+
       <!-- Preset Selector: 4 cards in a 2x2 / 4-col grid -->
-      <div class="mb-3 compress-only" id="preset-section">
+      <div class="mb-3" data-modes="compress merge" id="preset-section">
         <div class="small text-secondary mb-2">Nivel de compresión</div>
         <div class="row g-2">
           <div class="col-6 col-md-3">
@@ -324,7 +363,7 @@ body {
       </div>
 
       <!-- Compatibility selector -->
-      <div class="mb-3 compress-only" id="compat-section">
+      <div class="mb-3" data-modes="compress merge" id="compat-section">
         <div class="small text-secondary mb-2">Compatibilidad PDF</div>
         <select name="compatibility" id="compat-select" class="form-select rounded-3">
           {% for value, label in compatibilities %}
@@ -339,12 +378,12 @@ body {
         PDF/A elimina enlaces, marcadores y formularios del documento. El tamaño puede aumentar.
       </div>
 
-      <div class="info-note px-3 py-2 mb-4 small compress-only" id="fonts-note">
+      <div class="info-note px-3 py-2 mb-4 small" data-modes="compress merge" id="fonts-note">
         <i class="bi bi-shield-check me-1"></i>
         Fuentes incrustadas y subconjuntos optimizados en todos los modos
       </div>
 
-      <div class="info-note px-3 py-2 mb-4 small extract-only" id="extract-note" style="display:none">
+      <div class="info-note px-3 py-2 mb-4 small" data-modes="extract_images" id="extract-note">
         <i class="bi bi-info-circle me-1"></i>
         Extrae las imágenes embebidas del PDF en su resolución original y las empaqueta en un ZIP.
       </div>
@@ -353,13 +392,15 @@ body {
       <button type="submit" class="btn btn-primary btn-lg w-100 rounded-3" id="btn-compress" disabled>
         <span class="btn-text">
           <i class="bi bi-lightning-charge me-2"></i>
-          <span class="label-compress">Comprimir PDF</span>
-          <span class="label-extract" style="display:none">Extraer imágenes</span>
+          <span data-modes="compress">Comprimir PDF</span>
+          <span data-modes="extract_images">Extraer imágenes</span>
+          <span data-modes="merge">Combinar y comprimir</span>
         </span>
         <span class="htmx-indicator">
           <span class="spinner-border spinner-border-sm me-2"></span>
-          <span class="label-compress">Comprimiendo...</span>
-          <span class="label-extract" style="display:none">Extrayendo...</span>
+          <span data-modes="compress">Comprimiendo...</span>
+          <span data-modes="extract_images">Extrayendo...</span>
+          <span data-modes="merge">Combinando...</span>
         </span>
       </button>
     </form>
@@ -395,8 +436,128 @@ const fileName = document.getElementById('file-name');
 const fileSize = document.getElementById('file-size');
 const btnCompress = document.getElementById('btn-compress');
 
+const mergePicker = document.getElementById('merge-picker');
+const mergeInput = document.getElementById('merge-input');
+const mergeList = document.getElementById('merge-list');
+const mergeItems = document.getElementById('merge-items');
+const mergeSummary = document.getElementById('merge-summary');
+const mergeWarning = document.getElementById('merge-warning');
+
+// Same limits as compressor/views.py
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MERGE_MIN_FILES = 2;
+const MERGE_MAX_FILES = 100;
+const MERGE_MAX_TOTAL_SIZE = 300 * 1024 * 1024;
+
+let mergeFiles = [];   // ordered: this order is the final PDF's page order
+let dragIndex = null;
+
+function currentMode() {
+    return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function formatMB(bytes) {
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function isPdf(file) {
+    return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+}
+
+function addMergeFiles(files) {
+    const warnings = [];
+    for (const file of files) {
+        if (!isPdf(file)) { warnings.push(`${file.name} no es un PDF`); continue; }
+        if (file.size > MAX_FILE_SIZE) { warnings.push(`${file.name} supera 100 MB`); continue; }
+        if (mergeFiles.length >= MERGE_MAX_FILES) { warnings.push('Máximo 100 archivos por combinación'); break; }
+        mergeFiles.push(file);
+    }
+    renderMerge(warnings);
+}
+
+function moveMergeFile(from, to) {
+    const [file] = mergeFiles.splice(from, 1);
+    mergeFiles.splice(to, 0, file);
+    renderMerge();
+}
+
+function mergeRow(file, index) {
+    const row = document.createElement('div');
+    row.className = 'merge-item d-flex align-items-center gap-2 px-2 py-1 small';
+    row.draggable = true;
+
+    const handle = document.createElement('i');
+    handle.className = 'bi bi-grip-vertical text-secondary';
+    const pos = document.createElement('span');
+    pos.className = 'merge-pos';
+    pos.textContent = `${index + 1}.`;
+    const name = document.createElement('span');
+    name.className = 'merge-name flex-grow-1';
+    name.textContent = file.name;   // textContent: filenames are untrusted
+    name.title = file.name;
+    const size = document.createElement('span');
+    size.className = 'text-secondary';
+    size.textContent = formatMB(file.size);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'merge-remove';
+    remove.title = 'Quitar';
+    remove.innerHTML = '<i class="bi bi-x-lg"></i>';
+    remove.addEventListener('click', () => { mergeFiles.splice(index, 1); renderMerge(); });
+
+    row.addEventListener('dragstart', (e) => {
+        dragIndex = index;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => { dragIndex = null; row.classList.remove('dragging'); });
+    row.addEventListener('dragover', (e) => {
+        if (dragIndex === null) return;   // ignore files dragged from the desktop
+        e.preventDefault();
+        row.classList.add('drop-target');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
+    row.addEventListener('drop', (e) => {
+        if (dragIndex === null) return;
+        e.preventDefault();
+        const from = dragIndex;
+        dragIndex = null;
+        if (from !== index) moveMergeFile(from, index);
+        else renderMerge();
+    });
+
+    row.append(handle, pos, name, size, remove);
+    return row;
+}
+
+function renderMerge(warnings = []) {
+    mergeItems.replaceChildren(...mergeFiles.map(mergeRow));
+
+    // The submitted field mirrors the visible order.
+    const transfer = new DataTransfer();
+    mergeFiles.forEach(file => transfer.items.add(file));
+    mergeInput.files = transfer.files;
+
+    const total = mergeFiles.reduce((sum, file) => sum + file.size, 0);
+    if (total > MERGE_MAX_TOTAL_SIZE) warnings.push('El total supera 300 MB');
+    const count = mergeFiles.length;
+    mergeSummary.textContent = `${count} archivo${count === 1 ? '' : 's'} · ${formatMB(total)}`;
+    mergeList.classList.toggle('active', count > 0);
+    mergeWarning.textContent = warnings.join(' · ');
+    mergeWarning.style.display = warnings.length ? 'block' : 'none';
+    if (currentMode() === 'merge') {
+        btnCompress.disabled = !(count >= MERGE_MIN_FILES && total <= MERGE_MAX_TOTAL_SIZE);
+    }
+}
+
 // Click drop zone → open file dialog
-dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', () => {
+    (currentMode() === 'merge' ? mergePicker : fileInput).click();
+});
+mergePicker.addEventListener('change', () => {
+    addMergeFiles(mergePicker.files);
+    mergePicker.value = '';
+});
 
 // Drag & drop
 dropZone.addEventListener('dragenter', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
@@ -406,7 +567,9 @@ dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
     const files = e.dataTransfer.files;
-    if (files.length && files[0].type === 'application/pdf') {
+    if (currentMode() === 'merge') {
+        addMergeFiles(files);
+    } else if (files.length && files[0].type === 'application/pdf') {
         fileInput.files = files;
         showFile(files[0]);
     }
@@ -427,6 +590,8 @@ function showFile(file) {
 function resetForm() {
     fileInput.value = '';
     fileInfo.classList.remove('active');
+    mergeFiles = [];
+    renderMerge();
     btnCompress.disabled = true;
 }
 
@@ -446,23 +611,15 @@ compatSelect.addEventListener('change', () => {
     pdfaWarning.style.display = compatSelect.value === 'pdfa-2b' ? 'block' : 'none';
 });
 
-// Mode toggle: show/hide compression-only sections and swap button label
+// Mode toggle: elements declare the modes they belong to in data-modes.
+// Switching mode clears any selection so one mode's files never go out as another's.
 const modeRadios = document.querySelectorAll('input[name="mode"]');
 function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked').value;
-    const isCompress = mode === 'compress';
-    document.querySelectorAll('.compress-only').forEach(el => {
-        el.style.display = isCompress ? '' : 'none';
+    const mode = currentMode();
+    document.querySelectorAll('[data-modes]').forEach(el => {
+        el.style.display = el.dataset.modes.split(' ').includes(mode) ? '' : 'none';
     });
-    document.querySelectorAll('.extract-only').forEach(el => {
-        el.style.display = isCompress ? 'none' : '';
-    });
-    document.querySelectorAll('.label-compress').forEach(el => {
-        el.style.display = isCompress ? '' : 'none';
-    });
-    document.querySelectorAll('.label-extract').forEach(el => {
-        el.style.display = isCompress ? 'none' : '';
-    });
+    resetForm();
 }
 modeRadios.forEach(r => r.addEventListener('change', applyMode));
 applyMode();

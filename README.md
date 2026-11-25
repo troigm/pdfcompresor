@@ -1,6 +1,6 @@
 # MochaCompress
 
-Aplicación web para comprimir archivos PDF y extraer imágenes embebidas. Usa Ghostscript para compresión y `pdfimages` (poppler-utils) para extracción. Interfaz oscura Catppuccin Mocha con procesamiento asíncrono.
+Aplicación web para comprimir archivos PDF, combinar varios PDF en uno y extraer imágenes embebidas. Usa Ghostscript para compresión y `pdfimages` (poppler-utils) para extracción. Interfaz oscura Catppuccin Mocha con procesamiento asíncrono.
 
 ## Stack
 
@@ -45,12 +45,13 @@ docker compose -f docker-compose.prod.yml up --build -d
 ## Funcionalidades
 
 ### Modos de operación
-La interfaz ofrece dos modos seleccionables antes de la subida:
+La interfaz ofrece tres modos seleccionables antes de la subida:
 
 | Modo | Resultado | Motor |
 |------|-----------|-------|
 | Comprimir PDF | PDF comprimido | Ghostscript |
 | Extraer imágenes | ZIP con las imágenes embebidas en su resolución original | `pdfimages` (poppler-utils) |
+| Combinar y comprimir | Un único PDF con todas las entradas en el orden de la lista, comprimido | Ghostscript |
 
 ### Compresión de PDFs
 - Subida por arrastre (drag & drop) o selección de archivo
@@ -59,6 +60,16 @@ La interfaz ofrece dos modos seleccionables antes de la subida:
 - Progreso en tiempo real via HTMX (polling cada 2s)
 - Si el archivo comprimido es mayor que el original, se sirve el original
 - **Descarga única**: al descargar el resultado se elimina el job y los archivos físicos del servidor; la página se recarga automáticamente para ocultar el job borrado
+
+### Combinar y comprimir
+Pensado para enviar una factura junto con sus albaranes en un solo PDF.
+- Se añaden archivos por arrastre o selección (en varias tandas si hace falta); el orden de la lista es el orden de páginas del PDF final
+- Reordenar arrastrando las filas; quitar con ✕
+- Límites: de 2 a 100 archivos, 100 MB por archivo y 300 MB en total
+- Combina y comprime en una sola pasada de Ghostscript con el preset y la compatibilidad elegidos (timeout 600 s)
+- El resultado se llama como el primer archivo de la lista
+- Sin fallback: si el combinado pesa más que la suma de las entradas, se entrega igualmente
+- Misma descarga única + borrado automático (incluidas las entradas) que el resto de modos
 
 ### Extracción de imágenes
 - Ejecuta `pdfimages -all` para extraer cada imagen embebida en su formato original (JPEG, PNG, JBIG2, etc.)

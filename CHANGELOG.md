@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.0] - 2026-11-25
+
+### Añadido
+- Modo **Combinar y comprimir**: varios PDF (p. ej. factura + albaranes) en uno, en el orden de una lista reordenable, comprimido con Ghostscript en una sola pasada. De 2 a 100 archivos, 100 MB por archivo, 300 MB en total
+- Modelo `JobInput` (entradas ordenadas de un job) y migración `0005`
+- Primeros tests (`compressor/tests/`): comando de Ghostscript, modelo, tarea de combinación con Ghostscript real y validación de la subida
+
+### Cambiado
+- `build_gs_command()` extraída de `compress_pdf` y compartida con `merge_pdfs`
+- `PDFJob.delete_with_files()` usado por la descarga y por `cleanup_jobs` (borra también las entradas)
+- `FILE_UPLOAD_MAX_MEMORY_SIZE` vuelve al default de Django (2,5 MB): las subidas grandes van a disco temporal, no a RAM
+- `DATA_UPLOAD_MAX_NUMBER_FILES = 101` para que la vista devuelva su propio mensaje con más de 100 archivos
+- El badge de ahorro solo aparece si el resultado es más pequeño
+- `celery` y `kombu` fijados a `<5.7`: `kombu 5.7.0` importa `packaging` sin declararlo y el worker no arranca
+
 ## [1.3.0] - 2026-05-06
 
 ### Añadido
