@@ -62,7 +62,7 @@ La interfaz ofrece tres modos seleccionables antes de la subida:
 - **Descarga única**: al descargar el resultado se elimina el job y los archivos físicos del servidor; la página se recarga automáticamente para ocultar el job borrado
 
 ### Combinar y comprimir
-Pensado para enviar una factura junto con sus albaranes en un solo PDF.
+Junta varios PDF en uno solo, en el orden que se elija.
 - Se añaden archivos por arrastre o selección (en varias tandas si hace falta); el orden de la lista es el orden de páginas del PDF final
 - Reordenar arrastrando las filas; quitar con ✕
 - Límites: de 2 a 100 archivos, 100 MB por archivo y 300 MB en total
