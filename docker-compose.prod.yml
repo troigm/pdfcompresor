@@ -54,6 +54,8 @@ services:
       - "traefik.http.routers.pdfcompressor.rule=Host(`pdf.comrec.lan`)"
       - "traefik.http.routers.pdfcompressor.entrypoints=web"
       - "traefik.http.services.pdfcompressor.loadbalancer.server.port=8000"
+      - "comrec.traefik=approved"
+      - "traefik.http.routers.pdfcompressor.middlewares=lan-only@file"
 
   celery:
     build: .
