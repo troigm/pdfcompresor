@@ -219,3 +219,66 @@ def extract_images(self, job_id):
             os.unlink(tmp_zip.name)
         if os.path.exists(tmp_dir):
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=10)
+def merge_pdfs(self, job_id):
+    """Concatenate the job's inputs (by position) and compress them in one gs pass."""
+    from .models import JobStatus, PDFJob
+
+    job = PDFJob.objects.get(id=job_id)
+    job.status = JobStatus.PROCESSING
+    job.save(update_fields=["status"])
+
+    tmp_output = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    tmp_output.close()
+    pdfa_def_path = None
+
+    try:
+        inputs = list(job.inputs.all())
+        if job.compatibility == "pdfa-2b":
+            pdfa_def_path = _create_pdfa_def()
+        cmd = build_gs_command(
+            [job_input.file.path for job_input in inputs],
+            tmp_output.name,
+            job.preset,
+            job.compatibility,
+            pdfa_def_path,
+            gs_bin=getattr(settings, "GHOSTSCRIPT_BIN", "gs"),
+        )
+
+        # Up to 100 scanned inputs: allow more time than single-file compression.
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Ghostscript falló (code {result.returncode}): {result.stderr}"
+            )
+
+        # No fallback to the originals: the merged result is delivered even if larger.
+        original_size = sum(job_input.size for job_input in inputs)
+        compressed_size = os.path.getsize(tmp_output.name)
+        job.original_size = original_size
+        job.compressed_size = compressed_size
+        job.compression_ratio = compressed_size / original_size if original_size else 0
+
+        with open(tmp_output.name, "rb") as f:
+            job.compressed_file.save(job.original_filename, File(f), save=False)
+
+        job.status = JobStatus.COMPLETED
+        job.completed_at = timezone.now()
+        job.save()
+
+    except Exception as exc:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+
+        job.status = JobStatus.FAILED
+        job.error_message = str(exc)[:1000]
+        job.save(update_fields=["status", "error_message"])
+
+    finally:
+        if os.path.exists(tmp_output.name):
+            os.unlink(tmp_output.name)
+        if pdfa_def_path and os.path.exists(pdfa_def_path):
+            os.unlink(pdfa_def_path)
