@@ -36,7 +36,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 **Diferencias con dev:**
 - WhiteNoise sirve los static files (con compresión Brotli/Gzip y manifest)
 - Sin puerto publicado: el tráfico entra por Traefik vía la red `proxy`
-- Gunicorn con `--timeout 120` (subidas de 100 MB) y `--max-requests 500` (reciclado de workers)
+- Gunicorn con `--timeout 180` (por encima del `readTimeout` de 120 s del entrypoint `web` de Traefik, para subidas de hasta 300 MB) y `--max-requests 500` (reciclado de workers)
 - `restart: unless-stopped` en todos los servicios
 - `collectstatic` se ejecuta al arrancar el contenedor `web`
 
@@ -117,11 +117,13 @@ Los servicios `web` y `celery` comparten un volumen `media_data` para que el wor
 
 ## Limpieza de archivos
 
+`celery-beat` ejecuta `compressor.tasks.cleanup_old_jobs` cada hora (minuto 15): elimina jobs y archivos (incluidas las entradas de las combinaciones) con más de 24 horas, configurable vía `COMPRESSED_FILE_TTL_HOURS`. Cubre los jobs fallidos y los que nunca se descargan.
+
+A mano:
+
 ```bash
 docker compose exec web python manage.py cleanup_jobs
 ```
-
-Elimina jobs y archivos con más de 24 horas (configurable via `COMPRESSED_FILE_TTL_HOURS`).
 
 ## Variables de entorno
 

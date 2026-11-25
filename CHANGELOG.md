@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] - 2026-11-25
+
+### Añadido
+- Limpieza automática: `celery-beat` lanza `cleanup_old_jobs` cada hora (jobs con más de `COMPRESSED_FILE_TTL_HOURS`, también fallidos y no descargados)
+- `.dockerignore`: las imágenes ya no incluyen `.env*` ni `.git`
+
+### Cambiado
+- Gunicorn en producción con `--timeout 180` (el entrypoint `web` de Traefik pasa a `readTimeout: 120s`)
+- `docker-compose.prod.yml` versiona las etiquetas de bastionado de Traefik (`lan-only@file`, `comrec.traefik=approved`)
+
 ## [1.4.0] - 2026-11-25
 
 ### Añadido

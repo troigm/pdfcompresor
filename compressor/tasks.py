@@ -295,3 +295,11 @@ def merge_pdfs(self, job_id):
             os.unlink(tmp_output.name)
         if pdfa_def_path and os.path.exists(pdfa_def_path):
             os.unlink(pdfa_def_path)
+
+
+@shared_task
+def cleanup_old_jobs():
+    """Periodic (celery-beat): delete jobs and files older than COMPRESSED_FILE_TTL_HOURS."""
+    from django.core.management import call_command
+
+    call_command("cleanup_jobs")

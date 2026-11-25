@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from celery.schedules import crontab
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "insecure-dev-key")
@@ -94,6 +96,13 @@ CELERY_RESULT_BACKEND = "django-db"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_TASK_TRACK_STARTED = True
+# Failed or never-downloaded jobs (and their uploads) would otherwise stay on disk forever.
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-old-jobs": {
+        "task": "compressor.tasks.cleanup_old_jobs",
+        "schedule": crontab(minute=15),  # hourly; jobs older than COMPRESSED_FILE_TTL_HOURS
+    },
+}
 
 # Ghostscript
 GHOSTSCRIPT_BIN = os.environ.get("GHOSTSCRIPT_BIN", "gs")

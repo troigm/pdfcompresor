@@ -32,7 +32,7 @@ services:
         exec gunicorn pdf_compressor.wsgi:application \
           --bind 0.0.0.0:8000 \
           --workers 3 \
-          --timeout 120 \
+          --timeout 180 \
           --max-requests 500 \
           --max-requests-jitter 50 \
           --access-logfile - \
