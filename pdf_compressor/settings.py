@@ -82,8 +82,11 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # File upload limits
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100 MB
+# Uploads above Django's default 2.5 MB spill to temp files instead of RAM
+# (a merge job can carry 300 MB).
 DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+# One more than views.MERGE_MAX_FILES so the view returns its own readable error.
+DATA_UPLOAD_MAX_NUMBER_FILES = 101
 
 # Celery
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
