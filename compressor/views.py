@@ -107,16 +107,7 @@ def download(request, job_id):
         filename = job.original_filename
         content_type = "application/pdf"
 
-    original_path = job.original_file.path if job.original_file else None
-    compressed_path = job.compressed_file.path
-
-    for path in (original_path, compressed_path):
-        if path and os.path.exists(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
-    job.delete()
+    job.delete_with_files()
 
     response = HttpResponse(content, content_type=content_type)
     response["Content-Disposition"] = (

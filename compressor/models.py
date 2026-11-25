@@ -27,11 +27,13 @@ class JobStatus(models.TextChoices):
 class JobMode(models.TextChoices):
     COMPRESS = "compress", "Comprimir"
     EXTRACT_IMAGES = "extract_images", "Extraer imágenes"
+    MERGE = "merge", "Combinar y comprimir"
 
 
 class PDFJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    original_file = models.FileField(upload_to="uploads/%Y/%m/%d/")
+    # Empty in merge mode: the inputs live in JobInput.
+    original_file = models.FileField(upload_to="uploads/%Y/%m/%d/", blank=True)
     compressed_file = models.FileField(
         upload_to="compressed/%Y/%m/%d/", blank=True
     )
@@ -63,6 +65,16 @@ class PDFJob(models.Model):
     def __str__(self):
         return f"{self.original_filename} ({self.status})"
 
+    def delete_with_files(self):
+        """Delete the job and every file it owns (original, result and merge inputs)."""
+        for job_input in self.inputs.all():
+            job_input.file.delete(save=False)
+        if self.original_file:
+            self.original_file.delete(save=False)
+        if self.compressed_file:
+            self.compressed_file.delete(save=False)
+        self.delete()
+
     @property
     def savings_percent(self):
         if self.original_size and self.compressed_size:
@@ -86,3 +98,17 @@ class PDFJob(models.Model):
                 return f"{size:.1f} {unit}"
             size /= 1024
         return f"{size:.1f} TB"
+
+
+class JobInput(models.Model):
+    job = models.ForeignKey(PDFJob, on_delete=models.CASCADE, related_name="inputs")
+    file = models.FileField(upload_to="uploads/%Y/%m/%d/")
+    original_filename = models.CharField(max_length=255)
+    size = models.BigIntegerField()
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["position"]
+
+    def __str__(self):
+        return f"{self.position}: {self.original_filename}"

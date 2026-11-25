@@ -17,11 +17,7 @@ class Command(BaseCommand):
 
         count = 0
         for job in old_jobs:
-            if job.original_file:
-                job.original_file.delete(save=False)
-            if job.compressed_file:
-                job.compressed_file.delete(save=False)
-            job.delete()
+            job.delete_with_files()
             count += 1
 
         self.stdout.write(self.style.SUCCESS(f"Eliminados {count} jobs antiguos."))
