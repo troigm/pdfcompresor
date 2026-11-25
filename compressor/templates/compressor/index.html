@@ -388,6 +388,9 @@ body {
         Extrae las imágenes embebidas del PDF en su resolución original y las empaqueta en un ZIP.
       </div>
 
+      <!-- Server-side validation errors (400) land here -->
+      <div id="upload-error"></div>
+
       <!-- Submit Button: label changes per mode -->
       <button type="submit" class="btn btn-primary btn-lg w-100 rounded-3" id="btn-compress" disabled>
         <span class="btn-text">
@@ -461,7 +464,7 @@ function formatMB(bytes) {
 }
 
 function isPdf(file) {
-    return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    return file.name.toLowerCase().endsWith('.pdf');   // same rule as the server
 }
 
 function addMergeFiles(files) {
@@ -512,14 +515,17 @@ function mergeRow(file, index) {
     });
     row.addEventListener('dragend', () => { dragIndex = null; row.classList.remove('dragging'); });
     row.addEventListener('dragover', (e) => {
-        if (dragIndex === null) return;   // ignore files dragged from the desktop
         e.preventDefault();
-        row.classList.add('drop-target');
+        if (dragIndex !== null) row.classList.add('drop-target');
     });
     row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
     row.addEventListener('drop', (e) => {
-        if (dragIndex === null) return;
         e.preventDefault();
+        e.stopPropagation();
+        if (dragIndex === null) {   // files dropped from the desktop onto the list: append them
+            addMergeFiles(e.dataTransfer.files);
+            return;
+        }
         const from = dragIndex;
         dragIndex = null;
         if (from !== index) moveMergeFile(from, index);
@@ -569,7 +575,7 @@ dropZone.addEventListener('drop', (e) => {
     const files = e.dataTransfer.files;
     if (currentMode() === 'merge') {
         addMergeFiles(files);
-    } else if (files.length && files[0].type === 'application/pdf') {
+    } else if (files.length && isPdf(files[0])) {
         fileInput.files = files;
         showFile(files[0]);
     }
@@ -587,7 +593,33 @@ function showFile(file) {
     btnCompress.disabled = false;
 }
 
+const uploadError = document.getElementById('upload-error');
+
+// A drop outside the drop zone must not make the browser open the PDF (and lose the list).
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => e.preventDefault());
+
+// htmx does not swap 4xx/5xx by default: show validation errors next to the button instead.
+function fromUploadForm(e) {
+    // In beforeSwap/responseError, detail.elt is the swap target; the form is requestConfig.elt.
+    return e.detail.requestConfig && e.detail.requestConfig.elt.id === 'upload-form';
+}
+document.body.addEventListener('htmx:beforeSwap', (e) => {
+    if (!fromUploadForm(e)) return;
+    uploadError.replaceChildren();
+    if (e.detail.xhr.status === 400) {
+        e.detail.shouldSwap = true;
+        e.detail.isError = false;
+        e.detail.target = uploadError;
+    }
+});
+document.body.addEventListener('htmx:responseError', (e) => {
+    if (!fromUploadForm(e) || e.detail.xhr.status === 400) return;
+    uploadError.innerHTML = '<div class="alert alert-danger">Error del servidor. Inténtalo de nuevo en unos minutos.</div>';
+});
+
 function resetForm() {
+    uploadError.replaceChildren();
     fileInput.value = '';
     fileInfo.classList.remove('active');
     mergeFiles = [];
@@ -597,7 +629,8 @@ function resetForm() {
 
 // After successful upload: reset form + remove empty state
 document.body.addEventListener('htmx:afterRequest', (e) => {
-    if (e.detail.elt.id === 'upload-form' && e.detail.successful) {
+    // status check: a 400 swapped into #upload-error also reports successful=true
+    if (e.detail.elt.id === 'upload-form' && e.detail.successful && e.detail.xhr.status < 400) {
         resetForm();
         const empty = document.getElementById('empty-state');
         if (empty) empty.remove();
