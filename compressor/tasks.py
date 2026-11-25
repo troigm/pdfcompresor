@@ -44,6 +44,52 @@ def _create_pdfa_def():
     return tmp.name
 
 
+def build_gs_command(
+    input_paths, output_path, preset, compatibility, pdfa_def_path, gs_bin="gs"
+):
+    """Ghostscript pdfwrite command; inputs are concatenated in the given order."""
+    if compatibility == "pdfa-2b":
+        return [
+            gs_bin,
+            "-dPDFA=2",
+            "-dBATCH",
+            "-dNOPAUSE",
+            "-dNOOUTERSAVE",
+            "-sDEVICE=pdfwrite",
+            f"-dPDFSETTINGS=/{preset}",
+            "-sColorConversionStrategy=RGB",
+            "-dPDFACompatibilityPolicy=1",
+            "-dEmbedAllFonts=true",
+            "-dSubsetFonts=true",
+            "-dColorImageDownsampleType=/Bicubic",
+            "-dGrayImageDownsampleType=/Bicubic",
+            "-dMonoImageDownsampleType=/Subsample",
+            f"-sOutputFile={output_path}",
+            pdfa_def_path,
+            *input_paths,
+        ]
+
+    compat_map = {"pdf-1.4": "1.4", "pdf-1.5": "1.5", "pdf-1.7": "1.7"}
+    compat_version = compat_map.get(compatibility, "1.4")
+    return [
+        gs_bin,
+        "-sDEVICE=pdfwrite",
+        "-dNOPAUSE",
+        "-dQUIET",
+        "-dBATCH",
+        "-dSAFER",
+        f"-dCompatibilityLevel={compat_version}",
+        f"-dPDFSETTINGS=/{preset}",
+        "-dEmbedAllFonts=true",
+        "-dSubsetFonts=true",
+        "-dColorImageDownsampleType=/Bicubic",
+        "-dGrayImageDownsampleType=/Bicubic",
+        "-dMonoImageDownsampleType=/Subsample",
+        f"-sOutputFile={output_path}",
+        *input_paths,
+    ]
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=10)
 def compress_pdf(self, job_id):
     from .models import JobStatus, PDFJob
@@ -57,50 +103,18 @@ def compress_pdf(self, job_id):
     pdfa_def_path = None
 
     try:
-        gs_bin = getattr(settings, "GHOSTSCRIPT_BIN", "gs")
         input_path = job.original_file.path
 
         if job.compatibility == "pdfa-2b":
             pdfa_def_path = _create_pdfa_def()
-            cmd = [
-                gs_bin,
-                "-dPDFA=2",
-                "-dBATCH",
-                "-dNOPAUSE",
-                "-dNOOUTERSAVE",
-                "-sDEVICE=pdfwrite",
-                f"-dPDFSETTINGS=/{job.preset}",
-                "-sColorConversionStrategy=RGB",
-                "-dPDFACompatibilityPolicy=1",
-                "-dEmbedAllFonts=true",
-                "-dSubsetFonts=true",
-                "-dColorImageDownsampleType=/Bicubic",
-                "-dGrayImageDownsampleType=/Bicubic",
-                "-dMonoImageDownsampleType=/Subsample",
-                f"-sOutputFile={tmp_output.name}",
-                pdfa_def_path,
-                input_path,
-            ]
-        else:
-            compat_map = {"pdf-1.4": "1.4", "pdf-1.5": "1.5", "pdf-1.7": "1.7"}
-            compat_version = compat_map.get(job.compatibility, "1.4")
-            cmd = [
-                gs_bin,
-                "-sDEVICE=pdfwrite",
-                "-dNOPAUSE",
-                "-dQUIET",
-                "-dBATCH",
-                "-dSAFER",
-                f"-dCompatibilityLevel={compat_version}",
-                f"-dPDFSETTINGS=/{job.preset}",
-                "-dEmbedAllFonts=true",
-                "-dSubsetFonts=true",
-                "-dColorImageDownsampleType=/Bicubic",
-                "-dGrayImageDownsampleType=/Bicubic",
-                "-dMonoImageDownsampleType=/Subsample",
-                f"-sOutputFile={tmp_output.name}",
-                input_path,
-            ]
+        cmd = build_gs_command(
+            [input_path],
+            tmp_output.name,
+            job.preset,
+            job.compatibility,
+            pdfa_def_path,
+            gs_bin=getattr(settings, "GHOSTSCRIPT_BIN", "gs"),
+        )
 
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 
