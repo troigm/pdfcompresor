@@ -100,3 +100,27 @@ class MergePdfsTaskTests(TestCase):
 
         self.assertEqual(job.status, JobStatus.FAILED)
         self.assertTrue(job.error_message)
+
+    def test_empty_input_fails_naming_the_file(self):
+        job = self._job_with_inputs([
+            ("a.pdf", make_pdf("DOC-A", 1)),
+            ("vacio.pdf", b""),
+            ("c.pdf", make_pdf("DOC-C", 1)),
+        ])
+        merge_pdfs.apply(args=[str(job.id)])
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, JobStatus.FAILED)
+        self.assertIn("vacio.pdf", job.error_message)
+
+    def test_pdf_header_with_garbage_fails_naming_the_file(self):
+        job = self._job_with_inputs([
+            ("a.pdf", make_pdf("DOC-A", 1)),
+            ("truncado.pdf", b"%PDF-1.4\n" + b"\x00garbage" * 50),
+            ("c.pdf", make_pdf("DOC-C", 1)),
+        ])
+        merge_pdfs.apply(args=[str(job.id)])
+        job.refresh_from_db()
+
+        self.assertEqual(job.status, JobStatus.FAILED)
+        self.assertIn("truncado.pdf", job.error_message)

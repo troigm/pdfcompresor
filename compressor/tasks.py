@@ -221,6 +221,17 @@ def extract_images(self, job_id):
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def _check_readable_pdf(path, filename):
+    """Fail on inputs gs would silently skip (0 bytes, valid header + garbage)."""
+    result = subprocess.run(["pdfinfo", path], capture_output=True, text=True, timeout=60)
+    pages = next(
+        (line.split()[1] for line in result.stdout.splitlines() if line.startswith("Pages:")),
+        "0",
+    )
+    if result.returncode != 0 or pages == "0":
+        raise RuntimeError(f"{filename} no es un PDF válido o está dañado.")
+
+
 @shared_task(bind=True, max_retries=2, default_retry_delay=10)
 def merge_pdfs(self, job_id):
     """Concatenate the job's inputs (by position) and compress them in one gs pass."""
@@ -236,6 +247,8 @@ def merge_pdfs(self, job_id):
 
     try:
         inputs = list(job.inputs.all())
+        for job_input in inputs:
+            _check_readable_pdf(job_input.file.path, job_input.original_filename)
         if job.compatibility == "pdfa-2b":
             pdfa_def_path = _create_pdfa_def()
         cmd = build_gs_command(
